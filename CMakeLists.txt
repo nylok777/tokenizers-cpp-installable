@@ -34,7 +34,12 @@ set(CARGO_EXTRA_ENVS "")
 message(STATUS "system-name" ${CMAKE_SYSTEM_NAME})
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  include(GNUInstallDirs)
+  find_package(msgpack-cxx CONFIG REQUIRED)
+  find_package(PkgConfig REQUIRED)
+  pkg_check_modules(SPM REQUIRED sentencepiece)
   list(APPEND TOKENIZERS_C_LINK_LIBS ${CMAKE_DL_LIBS})
+  list(APPEND TOKENIZERS_CPP_LINK_LIBS ${SPM_LIBRARIES})
   if (CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
     set(TOKENIZERS_CPP_CARGO_TARGET aarch64-unknown-linux-gnu)
     set(CARGO_EXTRA_ENVS
@@ -119,7 +124,7 @@ get_filename_component(TOKENIZERS_CPP_ROOT ${CMAKE_CURRENT_LIST_FILE} DIRECTORY)
 set(TOKENIZERS_CPP_CARGO_SOURCE_PATH ${TOKENIZERS_CPP_ROOT}/rust)
 
 option(MSGPACK_USE_BOOST "Use Boost libraried" OFF)
-add_subdirectory(msgpack)
+#add_subdirectory(msgpack)
 
 option(MLC_ENABLE_SENTENCEPIECE_TOKENIZER "Enable SentencePiece tokenizer" ON)
 
@@ -171,9 +176,12 @@ set(
   src/rwkv_world_tokenizer.cc
 )
 add_library(tokenizers_cpp STATIC ${TOKENIZER_CPP_SRCS})
-target_include_directories(tokenizers_cpp PRIVATE sentencepiece/src)
-target_include_directories(tokenizers_cpp PRIVATE msgpack/include)
-target_include_directories(tokenizers_cpp PUBLIC ${TOKENIZERS_CPP_INCLUDE})
+#target_include_directories(tokenizers_cpp PRIVATE sentencepiece/src)
+#target_include_directories(tokenizers_cpp PRIVATE msgpack/include)
+target_include_directories(tokenizers_cpp PUBLIC
+        $<BUILD_INTERFACE:${TOKENIZERS_CPP_INCLUDE}>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+)
 if (MLC_ENABLE_SENTENCEPIECE_TOKENIZER STREQUAL "ON")
     target_compile_definitions(tokenizers_cpp PUBLIC MLC_ENABLE_SENTENCEPIECE_TOKENIZER)
 endif ()
@@ -191,10 +199,39 @@ if (CMAKE_SYSTEM_NAME STREQUAL "iOS")
           XCODE_ATTRIBUTE_${XCODE_PROPERTY} ${XCODE_VALUE})
   endmacro (set_xcode_property)
 endif()
-add_subdirectory(sentencepiece sentencepiece EXCLUDE_FROM_ALL)
+#add_subdirectory(sentencepiece sentencepiece EXCLUDE_FROM_ALL)
 
 add_library(tokenizers_c INTERFACE ${TOKENIZERS_RUST_LIB})
 target_link_libraries(tokenizers_c INTERFACE ${TOKENIZERS_RUST_LIB} ${TOKENIZERS_C_LINK_LIBS})
 
-target_link_libraries(tokenizers_cpp PRIVATE tokenizers_c sentencepiece-static ${TOKENIZERS_CPP_LINK_LIBS})
-target_include_directories(tokenizers_cpp PUBLIC ${TOKENIZERS_CPP_INCLUDE})
+target_link_libraries(tokenizers_cpp PRIVATE tokenizers_c ${TOKENIZERS_CPP_LINK_LIBS})
+target_include_directories(tokenizers_cpp PUBLIC ${SPM_INCLUDE_DIRS})
+
+install(TARGETS tokenizers_c tokenizers_cpp
+    EXPORT TokenizersCppTargets
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
+install(FILES include/tokenizers_c.h include/tokenizers_cpp.h
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/tokenizers_cpp
+)
+
+install(EXPORT TokenizersCppTargets
+        FILE TokenizersCppTargets.cmake
+        NAMESPACE TokenizersCpp::
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/TokenizersCpp
+)
+
+include(CMakePackageConfigHelpers)
+configure_package_config_file(
+		"${CMAKE_CURRENT_SOURCE_DIR}/Config.cmake.in"
+		"${CMAKE_CURRENT_BINARY_DIR}/TokenizersCppConfig.cmake"
+		INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/TokenizersCpp
+)
+
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/TokenizersCppConfig.cmake"
+		DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/TokenizersCpp
+)
