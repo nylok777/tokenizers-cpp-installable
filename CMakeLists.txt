@@ -185,7 +185,7 @@ target_include_directories(tokenizers_cpp PUBLIC
 if (MLC_ENABLE_SENTENCEPIECE_TOKENIZER STREQUAL "ON")
     target_compile_definitions(tokenizers_cpp PUBLIC MLC_ENABLE_SENTENCEPIECE_TOKENIZER)
 endif ()
-target_link_libraries(tokenizers_cpp PRIVATE msgpack-cxx)
+target_link_libraries(tokenizers_cpp PUBLIC msgpack-cxx)
 
 # sentencepiece config
 option(SPM_ENABLE_SHARED "override sentence piece config" OFF)
@@ -216,7 +216,7 @@ install(TARGETS tokenizers_c tokenizers_cpp
 )
 
 install(FILES include/tokenizers_c.h include/tokenizers_cpp.h
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/tokenizers_cpp
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
 install(EXPORT TokenizersCppTargets
